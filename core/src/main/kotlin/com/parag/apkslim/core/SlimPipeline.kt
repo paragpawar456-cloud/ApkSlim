@@ -1,8 +1,17 @@
 package com.parag.apkslim.core
 
 import java.io.File
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
-/** analyze → optimize → sign → verify, with one progress stream. */
+/**
+ * analyze → optimize → (sign → verify | pack .slim → check), with one progress stream.
+ *
+ * Handles single APKs and split installs (base.apk + split_config.*.apk). For split installs
+ * every part is optimized and signed with the same key, and the result is an ".apks" bundle
+ * (a zip of the APKs) that ApkSlim installs in one session.
+ */
 class SlimPipeline(private val imageProcessor: ImageProcessor?) {
 
     fun run(
@@ -13,41 +22,140 @@ class SlimPipeline(private val imageProcessor: ImageProcessor?) {
         key: SigningKey,
         progress: ProgressListener = ProgressListener { _, _, _ -> },
         isCancelled: () -> Boolean = { false },
+    ): OptimizeResult = runAll(listOf(NamedApk("base.apk", input)), ArchiveMeta("", "", "", options.minSdk), output, workDir, options, key, progress, isCancelled)
+
+    fun runAll(
+        inputs: List<NamedApk>,
+        meta: ArchiveMeta,
+        output: File,
+        workDir: File,
+        options: OptimizeOptions,
+        key: SigningKey?,
+        progress: ProgressListener = ProgressListener { _, _, _ -> },
+        isCancelled: () -> Boolean = { false },
     ): OptimizeResult {
+        require(inputs.isNotEmpty())
         val start = System.currentTimeMillis()
-        workDir.mkdirs()
-        val before = ApkAnalyzer.analyze(input)
-        val unsigned = File(workDir, "unsigned-${System.nanoTime()}.apk")
+        val runDir = File(workDir, "run-${System.nanoTime()}").apply { mkdirs() }
+        val before = ApkAnalyzer.analyzeAll(inputs.map { it.file })
         try {
-            val stats = ApkOptimizer(imageProcessor).optimize(input, unsigned, options, progress, isCancelled)
-            if (isCancelled()) throw CancelledException()
-
-            progress.onProgress(Stage.SIGNING, 0f, "")
+            // 1. Optimize every part.
+            var stats: OptimizeStats? = null
+            val unsigned = inputs.mapIndexed { i, apk ->
+                if (isCancelled()) throw CancelledException()
+                val out = File(runDir, "u$i.apk")
+                val s = ApkOptimizer(imageProcessor).optimize(apk.file, out, options, progress, isCancelled)
+                stats = stats?.plus(s) ?: s
+                NamedApk(apk.name, out)
+            }
             output.parentFile?.mkdirs()
-            ApkSigning.sign(unsigned, output, key, options.minSdk)
-            progress.onProgress(Stage.SIGNING, 1f, "")
 
-            progress.onProgress(Stage.VERIFYING, 0f, "")
-            val verify = ApkSigning.verify(output, options.minSdk)
-            val after = ApkAnalyzer.analyze(output)
+            val verify: VerifyResult
+            var after: Map<Category, Long>? = null
+            if (options.format == OutputFormat.ARCHIVE) {
+                // 2a. Pack into one solid XZ archive, then read it back to prove it is intact.
+                SlimArchive.pack(unsigned, meta.copy(apkNames = inputs.map { it.name }), output, progress, isCancelled)
+                SlimArchive.check(output, progress)
+                verify = VerifyResult(true, listOf("archive"), emptyList())
+            } else {
+                // 2b. Sign every part with the same key.
+                val k = key ?: error("A signing key is required for APK output")
+                val signed = unsigned.mapIndexed { i, apk ->
+                    progress.onProgress(Stage.SIGNING, i.toFloat() / unsigned.size, apk.name)
+                    val out = if (unsigned.size == 1) output else File(runDir, "s$i-${apk.name}")
+                    ApkSigning.sign(apk.file, out, k, options.minSdk)
+                    NamedApk(apk.name, out)
+                }
+                progress.onProgress(Stage.VERIFYING, 0f, "")
+                val results = signed.map { ApkSigning.verify(it.file, options.minSdk) }
+                verify = VerifyResult(results.all { it.verified }, results.first().schemes, results.flatMap { it.errors })
+                after = ApkAnalyzer.analyzeAll(signed.map { it.file }).byCategory
+                if (signed.size > 1) bundle(signed, output)
+            }
             progress.onProgress(Stage.DONE, 1f, "")
 
             return OptimizeResult(
-                input = input,
+                input = inputs[0].file,
                 output = output,
-                originalSize = input.length(),
+                originalSize = inputs.sumOf { it.file.length() },
                 optimizedSize = output.length(),
                 before = before.byCategory,
-                after = after.byCategory,
-                stats = stats,
+                after = after,
+                stats = stats!!,
                 verify = verify,
                 durationMs = System.currentTimeMillis() - start,
+                format = options.format,
+                apkCount = inputs.size,
             )
         } catch (t: Throwable) {
             output.delete()
             throw t
         } finally {
-            unsigned.delete()
+            runDir.deleteRecursively()
+        }
+    }
+
+    /**
+     * Restores a .slim archive into signed APK(s) in [outDir].
+     * Returns the archive metadata and the installable files (one per split).
+     */
+    fun restore(
+        archive: File,
+        outDir: File,
+        workDir: File,
+        key: SigningKey,
+        progress: ProgressListener = ProgressListener { _, _, _ -> },
+        isCancelled: () -> Boolean = { false },
+    ): Pair<ArchiveMeta, List<File>> {
+        val runDir = File(workDir, "restore-${System.nanoTime()}").apply { mkdirs() }
+        try {
+            val (meta, unsigned) = SlimArchive.unpack(archive, runDir, progress, isCancelled)
+            outDir.mkdirs()
+            val signed = unsigned.mapIndexed { i, apk ->
+                progress.onProgress(Stage.SIGNING, i.toFloat() / unsigned.size, apk.name)
+                val out = File(outDir, apk.file.name)
+                ApkSigning.sign(apk.file, out, key, meta.minSdk)
+                val v = ApkSigning.verify(out, meta.minSdk)
+                check(v.verified) { "Restored ${apk.name} failed verification: ${v.errors.firstOrNull()}" }
+                out
+            }
+            progress.onProgress(Stage.DONE, 1f, "")
+            return meta to signed
+        } finally {
+            runDir.deleteRecursively()
+        }
+    }
+
+    companion object {
+        /** .apks bundle: a plain zip holding the split APKs, stored (they're already compressed). */
+        fun bundle(apks: List<NamedApk>, output: File) {
+            ZipOutputStream(output.outputStream().buffered(1 shl 16)).use { z ->
+                for (a in apks) {
+                    val crc = CRC32()
+                    a.file.inputStream().buffered().use { ins ->
+                        val buf = ByteArray(1 shl 16)
+                        while (true) { val n = ins.read(buf); if (n < 0) break; crc.update(buf, 0, n) }
+                    }
+                    val e = ZipEntry(a.name).apply {
+                        method = ZipEntry.STORED; size = a.file.length(); compressedSize = size; this.crc = crc.value
+                    }
+                    z.putNextEntry(e)
+                    a.file.inputStream().use { it.copyTo(z, 1 shl 16) }
+                    z.closeEntry()
+                }
+            }
+        }
+
+        /** Extracts an .apks bundle into [dir] and returns the APK files. */
+        fun unbundle(apks: File, dir: File): List<File> {
+            dir.mkdirs()
+            return java.util.zip.ZipFile(apks).use { z ->
+                z.entries().asSequence().filter { it.name.endsWith(".apk") && !it.isDirectory }.map { e ->
+                    val f = File(dir, File(e.name).name)
+                    z.getInputStream(e).use { ins -> f.outputStream().use { ins.copyTo(it) } }
+                    f
+                }.toList()
+            }
         }
     }
 }

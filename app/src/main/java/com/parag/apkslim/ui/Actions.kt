@@ -15,33 +15,25 @@ object ApkActions {
     private fun uriFor(context: Context, file: File): Uri =
         FileProvider.getUriForFile(context, "${context.packageName}.files", file)
 
+    fun mimeFor(file: File): String = if (file.name.endsWith(".apk")) APK_MIME else "application/octet-stream"
+
     fun share(context: Context, file: File) {
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = APK_MIME
+            type = mimeFor(file)
             putExtra(Intent.EXTRA_STREAM, uriFor(context, file))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(send, "Share optimized APK"))
+        context.startActivity(Intent.createChooser(send, "Share ${file.name}"))
     }
 
-    /** Opens the system installer; asks for "Install unknown apps" permission first if needed. */
-    fun install(context: Context, file: File) {
-        if (!context.packageManager.canRequestPackageInstalls()) {
-            Toast.makeText(context, "Allow ApkSlim to install apps, then tap Install again.", Toast.LENGTH_LONG).show()
-            context.startActivity(
-                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-            )
-            return
-        }
-        val view = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uriFor(context, file), APK_MIME)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+    /** True if ApkSlim may install apps; otherwise opens the "Install unknown apps" setting. */
+    fun ensureInstallPermission(context: Context): Boolean {
+        if (context.packageManager.canRequestPackageInstalls()) return true
+        Toast.makeText(context, "Allow ApkSlim to install apps, then tap Install again.", Toast.LENGTH_LONG).show()
         try {
-            context.startActivity(view)
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(context, "No installer found on this device.", Toast.LENGTH_LONG).show()
-        }
+            context.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")))
+        } catch (_: ActivityNotFoundException) { }
+        return false
     }
 
     fun uninstall(context: Context, packageName: String) {

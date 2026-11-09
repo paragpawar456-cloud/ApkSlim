@@ -7,9 +7,13 @@ Kotlin, Jetpack Compose and Material 3. ApkSlim makes an APK smaller **without t
 |---|---|
 | Universal APK with native code for 3–4 CPU types | **30–70%** (a real 117.8 MB Termux APK came out at 34.6 MB, 70.6% smaller) |
 | Image-heavy app with no native code | 5–25% |
-| App installed from Google Play (already split per device) | 0–5% |
+| App installed from Google Play (already split per device) | 0–5% as installable APK, about 20–35% as a `.slim` archive |
 
 APKs are already zip-compressed, so no tool can honestly promise 50–70% on *every* APK. ApkSlim shows an estimate before it runs.
+
+## Output formats
+- **Installable**: a normal `.apk` (or `.apks` bundle for split apps such as Instagram), installed straight from ApkSlim.
+- **Smallest `.slim` archive**: every file is stored uncompressed inside one solid XZ/LZMA2 stream. App code (DEX) comes out about 33% smaller than the zip compression used inside APKs. A `.slim` can't be installed directly: open it in ApkSlim and tap **Restore & install**.
 
 ## What it does
 1. **Removes CPU code (native libraries) the device can't use**, for example x86 and armv7 on an arm64 phone. This is the biggest win.

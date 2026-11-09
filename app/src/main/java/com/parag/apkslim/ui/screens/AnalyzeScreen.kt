@@ -25,6 +25,8 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.CleaningServices
@@ -63,6 +65,7 @@ import com.parag.apkslim.AnalyzeState
 import com.parag.apkslim.Preset
 import com.parag.apkslim.core.ImageMode
 import com.parag.apkslim.core.OptimizeOptions
+import com.parag.apkslim.core.OutputFormat
 import com.parag.apkslim.core.SavingsEstimate
 import com.parag.apkslim.data.SigningInfo
 import com.parag.apkslim.ui.components.AppIcon
@@ -88,6 +91,7 @@ fun AnalyzeScreen(
     onPreset: (Preset) -> Unit,
     onToggleAbi: (String) -> Unit,
     onOptions: ((OptimizeOptions) -> OptimizeOptions) -> Unit,
+    onFormat: (OutputFormat) -> Unit,
     onOptimize: () -> Unit,
     onSigningSettings: () -> Unit,
     onBack: () -> Unit,
@@ -101,7 +105,7 @@ fun AnalyzeScreen(
         },
         bottomBar = {
             if (state is AnalyzeState.Ready && estimate != null) {
-                EstimateBar(state, estimate, onOptimize)
+                EstimateBar(state, estimate, options.format, onOptimize)
             }
         },
     ) { padding ->
@@ -116,7 +120,7 @@ fun AnalyzeScreen(
             is AnalyzeState.Error -> Box(Modifier.fillMaxSize().padding(padding).padding(24.dp), contentAlignment = Alignment.Center) {
                 InfoBanner(Icons.Outlined.ErrorOutline, "Couldn't read this APK", state.message, BannerTone.ERROR)
             }
-            is AnalyzeState.Ready -> ReadyContent(state, options, preset, signing, iconFor, onPreset, onToggleAbi, onOptions, onSigningSettings, padding)
+            is AnalyzeState.Ready -> ReadyContent(state, options, preset, signing, iconFor, onPreset, onToggleAbi, onOptions, onFormat, onSigningSettings, padding)
         }
     }
 }
@@ -132,6 +136,7 @@ private fun ReadyContent(
     onPreset: (Preset) -> Unit,
     onToggleAbi: (String) -> Unit,
     onOptions: ((OptimizeOptions) -> OptimizeOptions) -> Unit,
+    onFormat: (OutputFormat) -> Unit,
     onSigningSettings: () -> Unit,
     padding: PaddingValues,
 ) {
@@ -156,6 +161,15 @@ private fun ReadyContent(
                     )
                 }
             }
+        }
+
+        if (s.isMultiPart) item {
+            InfoBanner(
+                Icons.Outlined.Layers,
+                "Split app: ${s.info.parts.size} parts",
+                "Installed from an App Bundle. All parts are processed together and the result installs as one app (.apks), or packs into one .slim archive.",
+                BannerTone.INFO,
+            )
         }
 
         s.blockedReason?.let { reason ->
@@ -191,6 +205,34 @@ private fun ReadyContent(
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(preset.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            // ---- Output format ----
+            item {
+                ElevatedSection(Modifier.animateContentSize()) {
+                    OptionHeader(Icons.Outlined.Inventory2, "Output", "Choose between an APK you can install right away and a much smaller archive for storage or sharing.")
+                    Spacer(Modifier.height(12.dp))
+                    val formats = OutputFormat.entries
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        formats.forEachIndexed { i, f ->
+                            SegmentedButton(
+                                selected = options.format == f,
+                                onClick = { onFormat(f) },
+                                shape = SegmentedButtonDefaults.itemShape(i, formats.size),
+                            ) { Text(if (f == OutputFormat.APK) "Installable" else "Smallest .slim", maxLines = 1) }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (options.format == OutputFormat.APK)
+                            "A normal APK that installs directly. Code stays compressed the standard way, so apps that are mostly code shrink only a little."
+                        else
+                            "Packs everything with XZ/LZMA2, a much stronger compressor than the zip format inside APKs (app code typically 30–35 % smaller). " +
+                                "A .slim file can't be installed directly: open it in ApkSlim and tap Restore & install.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
 
@@ -307,7 +349,7 @@ private fun ReadyContent(
             }
 
             // ---- Signing ----
-            item {
+            if (options.format == OutputFormat.APK) item {
                 InfoBanner(
                     Icons.Outlined.Key,
                     "The APK will be re-signed",
@@ -349,7 +391,7 @@ private fun LargestFiles(s: AnalyzeState.Ready) {
 }
 
 @Composable
-private fun EstimateBar(s: AnalyzeState.Ready, e: SavingsEstimate, onOptimize: () -> Unit) {
+private fun EstimateBar(s: AnalyzeState.Ready, e: SavingsEstimate, format: OutputFormat, onOptimize: () -> Unit) {
     val total = e.total.coerceAtLeast(0)
     val pct = if (s.analysis.fileSize > 0) total * 100f / s.analysis.fileSize else 0f
     val animated by animateIntAsState((pct * 10).toInt(), label = "pct")
@@ -366,7 +408,7 @@ private fun EstimateBar(s: AnalyzeState.Ready, e: SavingsEstimate, onOptimize: (
             Button(onClick = onOptimize, enabled = s.blockedReason == null, contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp)) {
                 Icon(Icons.Outlined.Bolt, null)
                 Spacer(Modifier.width(6.dp))
-                Text("Optimize")
+                Text(if (format == OutputFormat.ARCHIVE) "Compress" else "Optimize")
             }
         }
     }

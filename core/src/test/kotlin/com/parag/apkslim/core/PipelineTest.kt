@@ -163,4 +163,51 @@ class PipelineTest {
         assertTrue(r.verify.verified, r.verify.errors.toString())
         assertTrue("v1" in r.verify.schemes)
     }
+
+    @Test
+    fun archiveRoundTripRestoresInstallableApk() {
+        val dir = Files.createTempDirectory("slim4").toFile()
+        val input = fakeApk(dir)
+        val archive = File(dir, "out.slim")
+        val opts = OptimizeOptions(keepAbis = setOf("arm64-v8a"), imageMode = ImageMode.OFF, minSdk = 26, format = OutputFormat.ARCHIVE)
+        val r = SlimPipeline(null).runAll(listOf(NamedApk("base.apk", input)), ArchiveMeta("Fake", "com.fake", "1.0", 26), archive, File(dir, "work"), opts, null)
+        println("archive: ${r.originalSize} -> ${r.optimizedSize} (${"%.1f".format(r.savedPercent)}%)")
+        assertTrue(SlimArchive.isArchive(archive))
+        assertTrue(r.verify.verified)
+
+        val (meta, files) = SlimPipeline(null).restore(archive, File(dir, "restored"), File(dir, "work"), key())
+        assertEquals("com.fake", meta.packageName)
+        assertEquals(1, files.size)
+        assertTrue(ApkSigning.verify(files[0], 26).verified)
+        val offsets = storedDataOffsets(files[0])
+        assertEquals(0L, offsets.getValue("lib/arm64-v8a/libnative.so") % 16384)
+        // Contents identical to the optimized APK
+        ZipFile(files[0]).use { z ->
+            val dex = z.getInputStream(z.getEntry("classes.dex")).readBytes()
+            assertEquals(ZipFile(input).use { o -> o.getInputStream(o.getEntry("classes.dex")).readBytes() }.toList(), dex.toList())
+            assertFalse(z.entries().toList().any { it.name.startsWith("lib/x86") })
+        }
+    }
+
+    @Test
+    fun splitInstallIsOptimizedAsBundle() {
+        val dir = Files.createTempDirectory("slim5").toFile()
+        val base = fakeApk(dir)
+        val split = File(dir, "split_config.xxhdpi.apk")
+        ZipOutputStream(split.outputStream()).use { z ->
+            z.deflated("AndroidManifest.xml", ByteArray(500) { 1 })
+            z.stored("res/drawable-xxhdpi/a.png", Random(3).nextBytes(5000))
+        }
+        val out = File(dir, "out.apks")
+        val r = SlimPipeline(null).runAll(
+            listOf(NamedApk("base.apk", base), NamedApk("split_config.xxhdpi.apk", split)),
+            ArchiveMeta("Fake", "com.fake", "1.0", 26), out, File(dir, "work"),
+            OptimizeOptions(keepAbis = setOf("arm64-v8a"), imageMode = ImageMode.OFF, minSdk = 26), key(),
+        )
+        assertTrue(r.verify.verified, r.verify.errors.toString())
+        assertEquals(2, r.apkCount)
+        val parts = SlimPipeline.unbundle(out, File(dir, "parts"))
+        assertEquals(setOf("base.apk", "split_config.xxhdpi.apk"), parts.map { it.name }.toSet())
+        parts.forEach { assertTrue(ApkSigning.verify(it, 26).verified) }
+    }
 }

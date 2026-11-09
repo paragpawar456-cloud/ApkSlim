@@ -15,5 +15,6 @@ kotlin {
 
 dependencies {
     api(libs.apksig)
+    implementation(libs.xz)
     testImplementation(kotlin("test"))
 }

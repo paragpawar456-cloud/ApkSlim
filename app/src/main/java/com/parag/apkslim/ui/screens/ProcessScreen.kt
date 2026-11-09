@@ -52,7 +52,7 @@ import com.parag.apkslim.ui.components.InfoBanner
 import com.parag.apkslim.ui.theme.Brand
 
 @Composable
-fun ProcessScreen(state: ProcessState, onCancel: () -> Unit, onBack: () -> Unit, onRetry: () -> Unit) {
+fun ProcessScreen(state: ProcessState, onCancel: () -> Unit, onBack: () -> Unit, onRetry: () -> Unit, steps: List<Stage> = APK_STEPS) {
     // Keep the screen on while working; big APKs can take a minute.
     val activity = LocalContext.current as? Activity
     DisposableEffect(Unit) {
@@ -62,7 +62,7 @@ fun ProcessScreen(state: ProcessState, onCancel: () -> Unit, onBack: () -> Unit,
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).systemBarsPadding().padding(24.dp)) {
         when (state) {
-            is ProcessState.Running, ProcessState.Idle, is ProcessState.Done -> Running(state as? ProcessState.Running, onCancel)
+            is ProcessState.Running, ProcessState.Idle, is ProcessState.Done, is ProcessState.Restored -> Running(state as? ProcessState.Running, onCancel, steps)
             is ProcessState.Failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 InfoBanner(Icons.Outlined.ErrorOutline, "Optimization failed", state.message, BannerTone.ERROR)
                 Spacer(Modifier.height(20.dp))
@@ -82,11 +82,16 @@ fun ProcessScreen(state: ProcessState, onCancel: () -> Unit, onBack: () -> Unit,
     }
 }
 
-private val STEPS = listOf(Stage.READING, Stage.IMAGES, Stage.REPACKING, Stage.SIGNING, Stage.VERIFYING)
+
+
+val APK_STEPS = listOf(Stage.READING, Stage.IMAGES, Stage.REPACKING, Stage.SIGNING, Stage.VERIFYING)
+val ARCHIVE_STEPS = listOf(Stage.READING, Stage.IMAGES, Stage.REPACKING, Stage.ARCHIVING, Stage.VERIFYING)
+val RESTORE_STEPS = listOf(Stage.READING, Stage.SIGNING)
 
 @Composable
-private fun Running(r: ProcessState.Running?, onCancel: () -> Unit) {
+private fun Running(r: ProcessState.Running?, onCancel: () -> Unit, steps: List<Stage> = APK_STEPS) {
     val stage = r?.stage ?: Stage.READING
+
     val pulse = rememberInfiniteTransition(label = "pulse")
     val scale by pulse.animateFloat(0.92f, 1.06f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "scale")
     val frac by animateFloatAsState(r?.fraction ?: 0f, label = "frac")
@@ -111,7 +116,7 @@ private fun Running(r: ProcessState.Running?, onCancel: () -> Unit) {
         LinearProgressIndicator(progress = { frac }, modifier = Modifier.fillMaxWidth(0.8f).height(6.dp).clip(CircleShape))
         Spacer(Modifier.height(28.dp))
         Column(Modifier.fillMaxWidth(0.8f)) {
-            STEPS.forEach { s ->
+            steps.forEach { s ->
                 val done = s.ordinal < stage.ordinal
                 val active = s == stage
                 Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {

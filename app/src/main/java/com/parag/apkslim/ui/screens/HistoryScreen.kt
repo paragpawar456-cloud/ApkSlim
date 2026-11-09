@@ -61,6 +61,7 @@ fun HistoryScreen(
     items: List<HistoryItem>,
     initialSelectedId: Long?,
     onDelete: (Long) -> Unit,
+    onInstall: (File) -> Unit,
     onClear: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -68,7 +69,7 @@ fun HistoryScreen(
     var selected by remember { mutableStateOf(items.firstOrNull { it.id == initialSelectedId }) }
     var confirmClear by remember { mutableStateOf(false) }
     var pendingSave by remember { mutableStateOf<HistoryItem?>(null) }
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.android.package-archive")) { uri ->
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         val item = pendingSave
         if (uri != null && item != null) {
             val ok = ApkActions.copyTo(context, File(item.outputPath), uri)
@@ -136,9 +137,9 @@ fun HistoryScreen(
                 if (item.outputExists) {
                     val f = File(item.outputPath)
                     ListItem(
-                        headlineContent = { Text("Install") },
+                        headlineContent = { Text(if (f.name.endsWith(".slim")) "Restore & install" else "Install") },
                         leadingContent = { Icon(Icons.Outlined.InstallMobile, null) },
-                        modifier = Modifier.clickableRow { ApkActions.install(context, f) },
+                        modifier = Modifier.clickableRow { if (ApkActions.ensureInstallPermission(context)) onInstall(f); selected = null },
                     )
                     ListItem(
                         headlineContent = { Text("Share") },

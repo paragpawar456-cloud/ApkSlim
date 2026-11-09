@@ -84,6 +84,7 @@ object Routes {
     const val ANALYZE = "analyze"
     const val PROCESS = "process"
     const val RESULT = "result"
+    const val RESTORE = "restore"
     const val HISTORY = "history?id={id}"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
@@ -100,6 +101,21 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
     val process by vm.process.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val signing by vm.signingInfo.collectAsStateWithLifecycle()
+    val installing by vm.installing.collectAsStateWithLifecycle()
+    val toast by vm.toast.collectAsStateWithLifecycle()
+    val openedArchive by vm.openedArchive.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(toast) {
+        toast?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); vm.toastShown() }
+    }
+    // A .slim archive was opened: restore it instead of analysing.
+    LaunchedEffect(openedArchive) {
+        openedArchive?.let { file ->
+            vm.consumeArchive()
+            vm.restore(file)
+            nav.navigate(Routes.RESTORE) { popUpTo(Routes.HOME) }
+        }
+    }
 
     val pickApk = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -119,7 +135,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
         composable(Routes.HOME) {
             HomeScreen(
                 history = history,
-                onPickFile = { pickApk.launch(arrayOf("application/vnd.android.package-archive", "application/octet-stream")) },
+                onPickFile = { pickApk.launch(arrayOf("*/*")) },
                 onInstalled = { nav.navigate(Routes.APPS) },
                 onHistory = { nav.navigate(Routes.history()) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
@@ -147,6 +163,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
                 onPreset = vm::applyPreset,
                 onToggleAbi = vm::toggleAbi,
                 onOptions = vm::updateOptions,
+                onFormat = vm::setFormat,
                 onOptimize = { vm.optimize(); nav.navigate(Routes.PROCESS) },
                 onSigningSettings = { nav.navigate(Routes.SETTINGS) },
                 onBack = { nav.popBackStack() },
@@ -164,14 +181,29 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
                 onCancel = vm::cancel,
                 onBack = { vm.resetProcess(); nav.popBackStack() },
                 onRetry = { vm.optimize() },
+                steps = if (options.format == com.parag.apkslim.core.OutputFormat.ARCHIVE) com.parag.apkslim.ui.screens.ARCHIVE_STEPS else com.parag.apkslim.ui.screens.APK_STEPS,
             )
         }
         composable(Routes.RESULT) {
             val done = process as? ProcessState.Done
             val close = { vm.resetProcess(); nav.popBackStack(Routes.HOME, inclusive = false); Unit }
             BackHandler { close() }
-            if (done != null) ResultScreen(done, onClose = close)
+            if (done != null) ResultScreen(done, installing, onInstall = { vm.install(it) }, onClose = close)
             else LaunchedEffect(Unit) { nav.popBackStack(Routes.HOME, inclusive = false) }
+        }
+        composable(Routes.RESTORE) {
+            val close = { vm.resetProcess(); nav.popBackStack(Routes.HOME, inclusive = false); Unit }
+            BackHandler { if (process is ProcessState.Running) vm.cancel() else close() }
+            when (val p = process) {
+                is ProcessState.Restored -> com.parag.apkslim.ui.screens.RestoredScreen(p, installing, onInstall = { vm.installFiles(p.files) }, onClose = close)
+                else -> ProcessScreen(
+                    state = p,
+                    onCancel = vm::cancel,
+                    onBack = close,
+                    onRetry = close,
+                    steps = com.parag.apkslim.ui.screens.RESTORE_STEPS,
+                )
+            }
         }
         composable(
             Routes.HISTORY,
@@ -182,6 +214,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
                 items = history,
                 initialSelectedId = id,
                 onDelete = { vm.deleteHistory(it) },
+                onInstall = { vm.install(it) },
                 onClear = { vm.clearHistory() },
                 onBack = { nav.popBackStack() },
             )

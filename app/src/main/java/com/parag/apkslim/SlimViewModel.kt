@@ -8,7 +8,11 @@ import androidx.lifecycle.viewModelScope
 import com.parag.apkslim.core.ApkAnalysis
 import com.parag.apkslim.core.ApkAnalyzer
 import com.parag.apkslim.core.CancelledException
+import com.parag.apkslim.core.ArchiveMeta
 import com.parag.apkslim.core.ImageMode
+import com.parag.apkslim.core.NamedApk
+import com.parag.apkslim.core.OutputFormat
+import com.parag.apkslim.core.SlimArchive
 import com.parag.apkslim.core.OptimizeOptions
 import com.parag.apkslim.core.OptimizeResult
 import com.parag.apkslim.core.SavingsEstimate
@@ -20,6 +24,7 @@ import com.parag.apkslim.data.AppRepository
 import com.parag.apkslim.data.HistoryItem
 import com.parag.apkslim.data.HistoryStore
 import com.parag.apkslim.data.InstalledApp
+import com.parag.apkslim.data.Installer
 import com.parag.apkslim.data.SigningInfo
 import com.parag.apkslim.data.SigningKeyManager
 import kotlinx.coroutines.Dispatchers
@@ -44,15 +49,13 @@ sealed interface AnalyzeState {
     data object Idle : AnalyzeState
     data class Loading(val message: String) : AnalyzeState
     data class Ready(val info: ApkInfo, val analysis: ApkAnalysis, val deviceAbi: String?) : AnalyzeState {
-        /** Optimizing only base.apk of a Play split install would produce an app that can't start. */
+        /** A lone config split (no code) can't become a working app by itself. */
         val blockedReason: String? get() = when {
-            analysis.isSplit -> "This file looks like a split APK (no app code inside). Split APKs can't be optimized on their own."
-            info.fromInstalledApp && info.installedSplitCount > 0 ->
-                "This app was installed from an App Bundle as ${info.installedSplitCount + 1} separate APKs. " +
-                    "Google Play already delivered only the parts your phone needs, so there's little to remove, " +
-                    "and rebuilding just the base APK would break the app."
+            analysis.isSplit && info.parts.size == 1 ->
+                "This file is one part (split) of an app, without the app's code. Pick the installed app instead, or open the full .apks bundle, so all parts are processed together."
             else -> null
         }
+        val isMultiPart: Boolean get() = info.parts.size > 1
     }
     data class Error(val message: String) : AnalyzeState
 }
@@ -61,6 +64,7 @@ sealed interface ProcessState {
     data object Idle : ProcessState
     data class Running(val stage: Stage, val fraction: Float, val detail: String) : ProcessState
     data class Done(val result: OptimizeResult, val history: HistoryItem, val info: ApkInfo) : ProcessState
+    data class Restored(val meta: ArchiveMeta, val files: List<File>, val archive: File) : ProcessState
     data class Failed(val message: String) : ProcessState
     data object Cancelled : ProcessState
 }
@@ -112,19 +116,43 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun openUri(uri: Uri) = startAnalysis("Copying APK…") { repo.importUri(uri) to false }
+    private val _openedArchive = MutableStateFlow<File?>(null)
+    /** Set when the user opened a .slim file: the UI routes to restore instead of analysis. */
+    val openedArchive: StateFlow<File?> = _openedArchive.asStateFlow()
 
-    fun openInstalled(app: InstalledApp) = startAnalysis("Reading ${app.label}…") { File(app.sourceDir) to true }
+    /** Opens a picked .apk, .apks bundle or .slim archive. Returns false for archives (restore flow). */
+    fun openUri(uri: Uri) = startAnalysis("Copying file…") {
+        val file = repo.importUri(uri)
+        when {
+            SlimArchive.isArchive(file) -> { _openedArchive.value = file; null }
+            file.name.endsWith(".apks", true) || isBundle(file) -> {
+                val parts = SlimPipeline.unbundle(file, File(file.parentFile, "parts")).map { NamedApk(it.name, it) }
+                val base = parts.firstOrNull { it.name == "base.apk" } ?: parts.first { f -> runCatching { !ApkAnalyzer.analyze(f.file).isSplit }.getOrDefault(false) }
+                Triple(base.file, false, listOf(base) + (parts - base))
+            }
+            else -> Triple(file, false, listOf(NamedApk("base.apk", file)))
+        }
+    }
 
-    private fun startAnalysis(message: String, source: suspend () -> Pair<File, Boolean>) {
+    fun openInstalled(app: InstalledApp) = startAnalysis("Reading ${app.label}…") {
+        Triple(File(app.sourceDir), true, repo.partsOf(app))
+    }
+
+    private fun isBundle(f: File) = runCatching {
+        java.util.zip.ZipFile(f).use { z -> z.entries().asSequence().any { it.name.endsWith(".apk") } && z.getEntry("AndroidManifest.xml") == null }
+    }.getOrDefault(false)
+
+    fun consumeArchive() { _openedArchive.value = null }
+
+    private fun startAnalysis(message: String, source: suspend () -> Triple<File, Boolean, List<NamedApk>>?) {
         _analyze.value = AnalyzeState.Loading(message)
         _process.value = ProcessState.Idle
         viewModelScope.launch {
             _analyze.value = withContext(Dispatchers.IO) {
                 try {
-                    val (file, installed) = source()
-                    val info = repo.describe(file, installed)
-                    val analysis = ApkAnalyzer.analyze(file)
+                    val (file, installed, parts) = source() ?: return@withContext AnalyzeState.Idle
+                    val info = repo.describe(file, installed, parts)
+                    val analysis = ApkAnalyzer.analyzeAll(parts.map { it.file })
                     val deviceAbi = Build.SUPPORTED_ABIS.firstOrNull { it in analysis.abiSizes.keys }
                     AnalyzeState.Ready(info, analysis, deviceAbi)
                 } catch (t: Throwable) {
@@ -140,7 +168,9 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
         _preset.value = p
         if (p == Preset.CUSTOM) return
         val keep = ready.deviceAbi?.let { setOf(it) }
+        val format = _options.value.format
         _options.value = OptimizeOptions(
+            format = format,
             keepAbis = keep,
             imageMode = when (p) { Preset.SAFE -> ImageMode.OFF; Preset.MAXIMUM -> ImageMode.LOSSY; else -> ImageMode.LOSSLESS },
             imageQuality = 80,
@@ -154,6 +184,12 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
     fun updateOptions(transform: (OptimizeOptions) -> OptimizeOptions) {
         _options.update(transform)
         _preset.value = Preset.CUSTOM
+        recompute()
+    }
+
+    /** Output format isn't part of a preset, so switching it keeps the preset selection. */
+    fun setFormat(format: OutputFormat) {
+        _options.update { it.copy(format = format) }
         recompute()
     }
 
@@ -178,15 +214,22 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
             val ctx = getApplication<Application>()
             val outDir = File(ctx.filesDir, "outputs").apply { mkdirs() }
             val safeName = ready.info.label.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').ifEmpty { "app" }
-            val output = File(outDir, "${safeName}_${ready.info.versionName.replace(Regex("[^A-Za-z0-9.]+"), "")}_slim_${System.currentTimeMillis()}.apk")
+            val opts = _options.value.copy(minSdk = ready.info.minSdk)
+            val ext = when {
+                opts.format == OutputFormat.ARCHIVE -> SlimArchive.EXTENSION
+                ready.isMultiPart -> "apks"
+                else -> "apk"
+            }
+            val output = File(outDir, "${safeName}_${ready.info.versionName.replace(Regex("[^A-Za-z0-9.]+"), "")}_slim_${System.currentTimeMillis()}.$ext")
             try {
-                val key = withContext(Dispatchers.IO) { signing.currentKey() }
+                val key = if (opts.format == OutputFormat.APK) withContext(Dispatchers.IO) { signing.currentKey() } else null
                 var lastEmit = 0L
-                val result = SlimPipeline(AndroidImageProcessor()).run(
-                    input = ready.info.file,
+                val result = SlimPipeline(AndroidImageProcessor()).runAll(
+                    inputs = ready.info.parts,
+                    meta = ArchiveMeta(ready.info.label, ready.info.packageName, ready.info.versionName, ready.info.minSdk),
                     output = output,
                     workDir = File(ctx.cacheDir, "work"),
-                    options = _options.value.copy(minSdk = ready.info.minSdk),
+                    options = opts,
                     key = key,
                     progress = { stage, fraction, detail ->
                         val now = System.currentTimeMillis()
@@ -226,11 +269,81 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancel() = cancelFlag.set(true)
 
+    /** Rebuilds installable APK(s) from a .slim archive and signs them with the current key. */
+    fun restore(archive: File) {
+        cancelFlag.set(false)
+        _process.value = ProcessState.Running(Stage.VERIFYING, 0f, "")
+        viewModelScope.launch(Dispatchers.Default) {
+            val ctx = getApplication<Application>()
+            val outDir = File(ctx.cacheDir, "restored").apply { deleteRecursively(); mkdirs() }
+            try {
+                val key = signing.currentKey()
+                var lastEmit = 0L
+                val (meta, files) = SlimPipeline(null).restore(
+                    archive, outDir, File(ctx.cacheDir, "work"), key,
+                    progress = { stage, fraction, detail ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmit > 60 || fraction >= 1f) {
+                            lastEmit = now
+                            _process.value = ProcessState.Running(if (stage == Stage.VERIFYING) Stage.READING else stage, fraction, detail)
+                        }
+                    },
+                    isCancelled = { cancelFlag.get() },
+                )
+                _process.value = ProcessState.Restored(meta, files, archive)
+            } catch (c: CancelledException) {
+                _process.value = ProcessState.Cancelled
+            } catch (t: Throwable) {
+                _process.value = ProcessState.Failed(t.message ?: t.javaClass.simpleName)
+            }
+        }
+    }
+
+    private val _installing = MutableStateFlow(false)
+    val installing: StateFlow<Boolean> = _installing.asStateFlow()
+    private val _toast = MutableStateFlow<String?>(null)
+    val toast: StateFlow<String?> = _toast.asStateFlow()
+    fun toastShown() { _toast.value = null }
+
+    /** Installs an output file: .apk directly, .apks as one multi-part session, .slim after restoring. */
+    fun install(file: File) {
+        if (_installing.value) return
+        _installing.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val ctx = getApplication<Application>()
+            try {
+                val apks = when {
+                    file.name.endsWith(".apks") -> SlimPipeline.unbundle(file, File(ctx.cacheDir, "install").apply { deleteRecursively() })
+                    SlimArchive.isArchive(file) -> SlimPipeline(null).restore(
+                        file, File(ctx.cacheDir, "install").apply { deleteRecursively() }, File(ctx.cacheDir, "work"), signing.currentKey(),
+                    ).second
+                    else -> listOf(file)
+                }
+                Installer.install(ctx, apks)
+            } catch (t: Throwable) {
+                _toast.value = "Install failed: ${t.message}"
+            } finally {
+                _installing.value = false
+            }
+        }
+    }
+
+    fun installFiles(files: List<File>) {
+        if (_installing.value) return
+        _installing.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            try { Installer.install(getApplication<Application>(), files) }
+            catch (t: Throwable) { _toast.value = "Install failed: ${t.message}" }
+            finally { _installing.value = false }
+        }
+    }
+
     fun resetProcess() { _process.value = ProcessState.Idle }
 
     private fun summarize(): String {
         val o = _options.value
         return buildList {
+            if (o.format == OutputFormat.ARCHIVE) add(".slim archive")
             o.keepAbis?.let { add("ABI: ${it.joinToString()}") }
             when (o.imageMode) {
                 ImageMode.LOSSLESS -> add("Lossless images")

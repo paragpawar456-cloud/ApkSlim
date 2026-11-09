@@ -85,7 +85,7 @@ fun HomeScreen(
             item { Hero(history) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionCard(Icons.Outlined.FolderOpen, "Pick APK file", "From storage or downloads", Modifier.weight(1f), onPickFile)
+                    ActionCard(Icons.Outlined.FolderOpen, "Open file", ".apk, .apks or .slim", Modifier.weight(1f), onPickFile)
                     ActionCard(Icons.Outlined.Apps, "Installed apps", "Extract & slim an app", Modifier.weight(1f), onInstalled)
                 }
             }
@@ -164,10 +164,11 @@ private fun ExpectationsCard(onAbout: () -> Unit) {
         Spacer(Modifier.height(6.dp))
         ExpectRow("Universal APKs with native code for 3–4 CPUs", "30–70%")
         ExpectRow("Image-heavy apps without native code", "5–25%")
-        ExpectRow("Apps installed from Google Play", "0–5%")
+        ExpectRow("Play Store apps as installable APK", "0–5%")
+        ExpectRow("Play Store apps as .slim archive", "20–35%")
         Spacer(Modifier.height(6.dp))
         Text(
-            "APKs are already compressed, so no tool can promise a fixed 50–70% for every app. ApkSlim shows an estimate before it touches anything.",
+            "APKs are already compressed, so no tool can promise a fixed 50–70% for every app. The .slim archive uses a stronger compressor for storage and sharing; ApkSlim restores it before installing. You see an estimate before anything changes.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

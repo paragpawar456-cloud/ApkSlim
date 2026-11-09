@@ -40,6 +40,9 @@ data class ApkAnalysis(
 
 enum class ImageMode { OFF, LOSSLESS, LOSSY }
 
+/** APK = installable output (.apk, or .apks for split apps). ARCHIVE = smallest .slim file for storage/sharing. */
+enum class OutputFormat { APK, ARCHIVE }
+
 data class OptimizeOptions(
     /** ABIs to keep. null = keep every ABI that is present. */
     val keepAbis: Set<String>? = null,
@@ -54,6 +57,7 @@ data class OptimizeOptions(
     val stripBuildMetadata: Boolean = true,
     /** minSdkVersion of the APK being processed (drives signature scheme & WebP support). */
     val minSdk: Int = 21,
+    val format: OutputFormat = OutputFormat.APK,
 )
 
 data class SavingsEstimate(
@@ -61,8 +65,10 @@ data class SavingsEstimate(
     val imageBytes: Long,
     val compressionBytes: Long,
     val metadataBytes: Long,
+    /** Extra saving from the .slim (XZ) container; 0 for installable output. */
+    val archiveBytes: Long = 0,
 ) {
-    val total: Long get() = abiBytes + imageBytes + compressionBytes + metadataBytes
+    val total: Long get() = abiBytes + imageBytes + compressionBytes + metadataBytes + archiveBytes
 }
 
 data class OptimizeStats(
@@ -84,10 +90,13 @@ data class OptimizeResult(
     val originalSize: Long,
     val optimizedSize: Long,
     val before: Map<Category, Long>,
-    val after: Map<Category, Long>,
+    /** null for archives (a solid XZ stream can't be split per category). */
+    val after: Map<Category, Long>?,
     val stats: OptimizeStats,
     val verify: VerifyResult,
     val durationMs: Long,
+    val format: OutputFormat = OutputFormat.APK,
+    val apkCount: Int = 1,
 ) {
     val savedBytes: Long get() = originalSize - optimizedSize
     val savedPercent: Float get() = if (originalSize == 0L) 0f else savedBytes * 100f / originalSize
@@ -109,9 +118,16 @@ enum class Stage(val label: String) {
     READING("Reading APK"),
     IMAGES("Optimizing images"),
     REPACKING("Repacking & aligning"),
+    ARCHIVING("Compressing archive (XZ)"),
     SIGNING("Signing"),
     VERIFYING("Verifying signature"),
     DONE("Done"),
 }
+
+fun OptimizeStats.plus(o: OptimizeStats) = OptimizeStats(
+    entriesIn + o.entriesIn, entriesOut + o.entriesOut, removedAbiEntries + o.removedAbiEntries,
+    removedAbiBytes + o.removedAbiBytes, removedMetadataBytes + o.removedMetadataBytes,
+    imagesOptimized + o.imagesOptimized, imagesConsidered + o.imagesConsidered, imageBytesSaved + o.imageBytesSaved,
+)
 
 class CancelledException : RuntimeException("Cancelled")

@@ -20,6 +20,7 @@ data class InstalledApp(
     val packageName: String,
     val versionName: String,
     val sourceDir: String,
+    val splitDirs: List<String>,
     val splitCount: Int,
     val totalSize: Long,
     val isSystem: Boolean,
@@ -37,6 +38,8 @@ data class ApkInfo(
     val installedSplitCount: Int,
     val isInstalled: Boolean,
     val fromInstalledApp: Boolean,
+    /** All APK parts: just the file itself, or base.apk + split_config.*.apk for split installs. */
+    val parts: List<com.parag.apkslim.core.NamedApk>,
 )
 
 class AppRepository(private val context: Context) {
@@ -58,6 +61,7 @@ class AppRepository(private val context: Context) {
                     packageName = ai.packageName,
                     versionName = runCatching { packageInfo(ai.packageName).versionName }.getOrNull() ?: "",
                     sourceDir = ai.sourceDir,
+                    splitDirs = ai.splitSourceDirs?.toList().orEmpty(),
                     splitCount = splits,
                     totalSize = size,
                     isSystem = ai.flags and ApplicationInfo.FLAG_SYSTEM != 0,
@@ -80,7 +84,7 @@ class AppRepository(private val context: Context) {
         }
     }.getOrNull()
 
-    fun describe(file: File, fromInstalledApp: Boolean): ApkInfo {
+    fun describe(file: File, fromInstalledApp: Boolean, parts: List<com.parag.apkslim.core.NamedApk> = listOf(com.parag.apkslim.core.NamedApk("base.apk", file))): ApkInfo {
         val info = archiveInfo(file) ?: error("This file is not a valid APK (Android could not parse its manifest).")
         val ai = info.applicationInfo!!
         ai.sourceDir = file.absolutePath
@@ -96,14 +100,21 @@ class AppRepository(private val context: Context) {
             installedSplitCount = installed?.applicationInfo?.splitSourceDirs?.size ?: 0,
             isInstalled = installed != null,
             fromInstalledApp = fromInstalledApp,
+            parts = parts,
         )
     }
+
+    /** Installed app → its parts (base + splits) as named files. */
+    fun partsOf(app: InstalledApp): List<com.parag.apkslim.core.NamedApk> =
+        listOf(com.parag.apkslim.core.NamedApk("base.apk", File(app.sourceDir))) +
+            app.splitDirs.map { com.parag.apkslim.core.NamedApk(File(it).name, File(it)) }
 
     /** Copies a picked document into the cache so we can random-access it as a zip. */
     fun importUri(uri: Uri): File {
         val name = displayName(uri)?.replace(Regex("[^A-Za-z0-9._-]"), "_") ?: "picked.apk"
         val dir = File(context.cacheDir, "inputs").apply { deleteRecursively(); mkdirs() }
-        val out = File(dir, if (name.endsWith(".apk", true)) name else "$name.apk")
+        val known = listOf(".apk", ".apks", ".slim").any { name.endsWith(it, true) }
+        val out = File(dir, if (known) name else "$name.apk")
         context.contentResolver.openInputStream(uri)?.use { ins -> out.outputStream().use { ins.copyTo(it, 1 shl 16) } }
             ?: error("Could not open the selected file")
         return out
