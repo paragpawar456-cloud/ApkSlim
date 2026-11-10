@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "9.5.1"
 kotlin = "2.1.0"
 apksig = "8.7.3"
 xz = "1.10"
