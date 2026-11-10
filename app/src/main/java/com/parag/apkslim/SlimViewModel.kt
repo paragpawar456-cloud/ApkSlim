@@ -101,6 +101,9 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
     private var processJob: Job? = null
     private val cancelFlag = AtomicBoolean(false)
 
+    private val _storage = MutableStateFlow(com.parag.apkslim.data.StorageInfo(0, 0))
+    val storage: StateFlow<com.parag.apkslim.data.StorageInfo> = _storage.asStateFlow()
+
     init {
         refreshStorage()
         refreshHistory()
@@ -109,8 +112,6 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
 
     fun icon(pkg: String) = repo.icon(pkg)
 
-    private val _storage = MutableStateFlow(com.parag.apkslim.data.StorageInfo(0, 0))
-    val storage: StateFlow<com.parag.apkslim.data.StorageInfo> = _storage.asStateFlow()
     fun refreshStorage() { viewModelScope.launch { _storage.value = withContext(Dispatchers.IO) { repo.storage() } } }
     fun iconFor(file: File) = repo.iconForArchive(file)
 
