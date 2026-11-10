@@ -150,11 +150,31 @@ class SlimPipeline(private val imageProcessor: ImageProcessor?) {
         fun unbundle(apks: File, dir: File): List<File> {
             dir.mkdirs()
             return java.util.zip.ZipFile(apks).use { z ->
-                z.entries().asSequence().filter { it.name.endsWith(".apk") && !it.isDirectory }.map { e ->
-                    val f = File(dir, File(e.name).name)
-                    z.getInputStream(e).use { ins -> f.outputStream().use { ins.copyTo(it) } }
+                val entries = z.entries().asSequence().filter { it.name.endsWith(".apk") && !it.isDirectory }.toList()
+                require(entries.isNotEmpty()) { "This .apks file has no APKs inside" }
+                require(entries.size <= Limits.MAX_PARTS) { "This .apks file has too many parts" }
+                val used = HashSet<String>()
+                var total = 0L
+                entries.map { e ->
+                    // Only the bare file name is used, so "../" in an entry name cannot escape [dir].
+                    var name = File(e.name).name.replace(Regex("[^A-Za-z0-9._-]"), "_").trimStart('.').ifEmpty { "part.apk" }
+                    var i = 1
+                    while (!used.add(name)) name = "${i++}_$name"
+                    val f = File(dir, name)
+                    z.getInputStream(e).use { ins ->
+                        f.outputStream().use { out ->
+                            val buf = ByteArray(1 shl 16)
+                            while (true) {
+                                val n = ins.read(buf)
+                                if (n < 0) break
+                                total += n
+                                require(total <= Limits.MAX_TOTAL_BYTES) { "This .apks file is too large" }
+                                out.write(buf, 0, n)
+                            }
+                        }
+                    }
                     f
-                }.toList()
+                }
             }
         }
     }

@@ -104,7 +104,10 @@ fun ElevatedSection(modifier: Modifier = Modifier, padding: Dp = 16.dp, content:
 
 @Composable
 fun AppIcon(key: Any, size: Dp = 44.dp, loader: () -> Bitmap?) {
-    val bmp by produceState<Bitmap?>(null, key) { value = withContext(Dispatchers.IO) { loader() } }
+    // Icons already seen are drawn on the first frame (no placeholder flash when returning to a tab).
+    val bmp by produceState(IconMemory.get(key), key) {
+        if (value == null) value = withContext(Dispatchers.IO) { loader() }?.also { IconMemory.put(key, it) }
+    }
     Box(
         Modifier.size(size).clip(RoundedCornerShape(size * 0.24f)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center,
@@ -113,6 +116,10 @@ fun AppIcon(key: Any, size: Dp = 44.dp, loader: () -> Bitmap?) {
         if (b != null) Image(b.asImageBitmap(), null, Modifier.size(size))
         else Icon(Icons.Outlined.Android, null, tint = AppTheme.extra.muted, modifier = Modifier.size(size * 0.5f))
     }
+}
+
+private object IconMemory : android.util.LruCache<Any, Bitmap>(16 shl 20) {
+    override fun sizeOf(key: Any, value: Bitmap) = value.allocationByteCount
 }
 
 /** The "ADD"-style button of delivery apps: white, orange outline, bold caps. */

@@ -26,6 +26,16 @@ object ApkActions {
         context.startActivity(Intent.createChooser(send, "Share ${file.name}"))
     }
 
+    /** Shares plain text (the crash report) through the user's choice of app. Nothing is sent automatically. */
+    fun shareText(context: Context, subject: String, text: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(send, subject))
+    }
+
     /** True if ApkSlim may install apps; otherwise opens the "Install unknown apps" setting. */
     fun ensureInstallPermission(context: Context): Boolean {
         if (context.packageManager.canRequestPackageInstalls()) return true

@@ -104,7 +104,13 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
     private val _storage = MutableStateFlow(com.parag.apkslim.data.StorageInfo(0, 0))
     val storage: StateFlow<com.parag.apkslim.data.StorageInfo> = _storage.asStateFlow()
 
+    private val _crashReport = MutableStateFlow<String?>(null)
+    /** Report from the last unexpected close, if any (shown once on Home). */
+    val crashReport: StateFlow<String?> = _crashReport.asStateFlow()
+    fun dismissCrashReport() { com.parag.apkslim.data.CrashLog.clear(); _crashReport.value = null }
+
     init {
+        viewModelScope.launch { _crashReport.value = withContext(Dispatchers.IO) { com.parag.apkslim.data.CrashLog.pending() } }
         refreshStorage()
         refreshHistory()
         refreshSigning()
@@ -162,7 +168,7 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
                     val deviceAbi = Build.SUPPORTED_ABIS.firstOrNull { it in analysis.abiSizes.keys }
                     AnalyzeState.Ready(info, analysis, deviceAbi)
                 } catch (t: Throwable) {
-                    AnalyzeState.Error(t.message ?: "Could not read this APK")
+                    AnalyzeState.Error(com.parag.apkslim.data.Errors.friendly(t, "Could not read this file"))
                 }
             }
             (analyze.value as? AnalyzeState.Ready)?.let { ready ->
@@ -274,7 +280,7 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
                 _process.value = ProcessState.Failed("Ran out of memory. Try turning image optimization off for this APK.")
             } catch (t: Throwable) {
                 output.delete()
-                _process.value = ProcessState.Failed(t.message ?: t.javaClass.simpleName)
+                _process.value = ProcessState.Failed(com.parag.apkslim.data.Errors.friendly(t))
             }
         }
     }
@@ -306,7 +312,7 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
             } catch (c: CancelledException) {
                 _process.value = ProcessState.Cancelled
             } catch (t: Throwable) {
-                _process.value = ProcessState.Failed(t.message ?: t.javaClass.simpleName)
+                _process.value = ProcessState.Failed(com.parag.apkslim.data.Errors.friendly(t))
             }
         }
     }
@@ -333,7 +339,7 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 Installer.install(ctx, apks)
             } catch (t: Throwable) {
-                _toast.value = "Install failed: ${t.message}"
+                _toast.value = "Install failed: " + com.parag.apkslim.data.Errors.friendly(t)
             } finally {
                 _installing.value = false
             }
@@ -345,7 +351,7 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
         _installing.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try { Installer.install(getApplication<Application>(), files) }
-            catch (t: Throwable) { _toast.value = "Install failed: ${t.message}" }
+            catch (t: Throwable) { _toast.value = "Install failed: " + com.parag.apkslim.data.Errors.friendly(t) }
             finally { _installing.value = false }
         }
     }

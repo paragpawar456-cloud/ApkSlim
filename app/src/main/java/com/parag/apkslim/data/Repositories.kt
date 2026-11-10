@@ -54,26 +54,28 @@ class AppRepository(private val context: Context) {
     private val iconCache = LruCache<String, Bitmap>(200)
 
     fun installedApps(): List<InstalledApp> {
+        // One getInstalledPackages call gives labels and versions together (was one extra IPC per app).
         @Suppress("DEPRECATION")
-        val apps = if (Build.VERSION.SDK_INT >= 33) {
-            pm.getInstalledApplications(PackageManager.ApplicationInfoFlags.of(0))
-        } else pm.getInstalledApplications(0)
-        return apps.asSequence()
-            .filter { it.packageName != context.packageName && it.sourceDir != null && File(it.sourceDir).canRead() }
-            .map { ai ->
+        val pkgs = if (Build.VERSION.SDK_INT >= 33) {
+            pm.getInstalledPackages(PackageManager.PackageInfoFlags.of(0))
+        } else pm.getInstalledPackages(0)
+        return pkgs.asSequence()
+            .mapNotNull { pi -> pi.applicationInfo?.let { pi to it } }
+            .filter { (_, ai) -> ai.packageName != context.packageName && ai.sourceDir != null && File(ai.sourceDir).canRead() }
+            .map { (pi, ai) ->
                 val splits = ai.splitSourceDirs?.size ?: 0
                 val size = File(ai.sourceDir).length() + (ai.splitSourceDirs?.sumOf { File(it).length() } ?: 0L)
                 InstalledApp(
                     label = ai.loadLabel(pm).toString(),
                     packageName = ai.packageName,
-                    versionName = runCatching { packageInfo(ai.packageName).versionName }.getOrNull() ?: "",
+                    versionName = pi.versionName ?: "",
                     sourceDir = ai.sourceDir,
                     splitDirs = ai.splitSourceDirs?.toList().orEmpty(),
                     splitCount = splits,
                     totalSize = size,
                     isSystem = ai.flags and ApplicationInfo.FLAG_SYSTEM != 0,
                     category = ai.category,
-                    lastUpdate = File(ai.sourceDir).lastModified(),
+                    lastUpdate = pi.lastUpdateTime,
                 )
             }
             .sortedBy { it.label.lowercase() }
@@ -84,6 +86,9 @@ class AppRepository(private val context: Context) {
         val st = android.os.StatFs(android.os.Environment.getDataDirectory().path)
         StorageInfo(st.totalBytes, st.availableBytes)
     }.getOrDefault(StorageInfo(0, 0))
+
+    /** Cached icon only, no loading: lets lists draw the real icon on the very first frame. */
+    fun peekIcon(packageName: String): Bitmap? = iconCache.get(packageName)
 
     fun icon(packageName: String): Bitmap? {
         iconCache.get(packageName)?.let { return it }
@@ -125,12 +130,40 @@ class AppRepository(private val context: Context) {
 
     /** Copies a picked document into the cache so we can random-access it as a zip. */
     fun importUri(uri: Uri): File {
-        val name = displayName(uri)?.replace(Regex("[^A-Za-z0-9._-]"), "_") ?: "picked.apk"
+        // Input checks: a safe file name, a size limit, enough free space, and the real file type
+        // read from its first bytes rather than trusted from the name.
+        val raw = displayName(uri) ?: "picked.apk"
+        val name = raw.replace(Regex("[^A-Za-z0-9._-]"), "_").trimStart('.').take(120).ifEmpty { "picked.apk" }
+        val declared = runCatching {
+            context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
+        }.getOrNull() ?: -1L
+        if (declared > InputLimits.MAX_INPUT_BYTES) throw UserFacingException("This file is too large (over ${InputLimits.MAX_INPUT_BYTES shr 30} GB).")
         val dir = File(context.cacheDir, "inputs").apply { deleteRecursively(); mkdirs() }
-        val known = listOf(".apk", ".apks", ".slim").any { name.endsWith(it, true) }
-        val out = File(dir, if (known) name else "$name.apk")
-        context.contentResolver.openInputStream(uri)?.use { ins -> out.outputStream().use { ins.copyTo(it, 1 shl 16) } }
-            ?: error("Could not open the selected file")
+        if (declared > 0 && dir.usableSpace < declared + InputLimits.SPACE_MARGIN) {
+            throw UserFacingException("Not enough free storage to open this file. Free up some space and try again.")
+        }
+        val tmp = File(dir, "incoming.tmp")
+        context.contentResolver.openInputStream(uri)?.use { ins ->
+            tmp.outputStream().use { out ->
+                val buf = ByteArray(1 shl 16)
+                var total = 0L
+                while (true) {
+                    val n = ins.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > InputLimits.MAX_INPUT_BYTES) throw UserFacingException("This file is too large.")
+                    out.write(buf, 0, n)
+                }
+            }
+        } ?: throw UserFacingException("Could not open the selected file.")
+        val ext = when (InputLimits.sniff(tmp)) {
+            InputLimits.Kind.SLIM -> ".slim"
+            InputLimits.Kind.ZIP -> if (name.endsWith(".apks", true)) ".apks" else ".apk"
+            InputLimits.Kind.UNKNOWN -> { tmp.delete(); throw UserFacingException("This is not an APK, .apks or .slim file.") }
+        }
+        val base = name.substringBeforeLast('.').ifEmpty { "picked" }
+        val out = File(dir, base + ext)
+        if (!tmp.renameTo(out)) { tmp.copyTo(out, true); tmp.delete() }
         return out
     }
 

@@ -12,9 +12,24 @@ android {
         applicationId = "com.parag.apkslim"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // CI passes the run number, so every published build is a proper upgrade of the last one.
+        val build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionCode = build
+        versionName = "1.1.$build"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        // Private release key from GitHub Actions secrets (never stored in the repo).
+        val ks = System.getenv("RELEASE_KEYSTORE_FILE")
+        if (!ks.isNullOrBlank() && file(ks).exists()) {
+            create("release") {
+                storeFile = file(ks)
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -23,9 +38,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so `assembleRelease` gives an installable APK out of the box.
-            // Replace with your own signingConfig before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            // Without the secrets (e.g. a fork), fall back to the debug key so the APK still installs.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {

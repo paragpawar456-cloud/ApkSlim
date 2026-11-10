@@ -98,6 +98,9 @@ fun HomeScreen(
     onAbout: () -> Unit,
     onOpenHistoryItem: (HistoryItem) -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    crashReport: String? = null,
+    onShareCrash: (String) -> Unit = {},
+    onDismissCrash: () -> Unit = {},
 ) {
     val userApps = remember(apps) { apps.orEmpty().filter { !it.isSystem } }
     val biggest = remember(userApps) { userApps.sortedByDescending { it.totalSize }.take(10) }
@@ -138,6 +141,24 @@ fun HomeScreen(
                     Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
                     Text("Search an app to compress", style = MaterialTheme.typography.bodyLarge, color = AppTheme.extra.muted)
+                }
+            }
+        }
+
+        // ---- Last run closed unexpectedly ----
+        if (crashReport != null) {
+            item {
+                com.parag.apkslim.ui.components.InfoBanner(
+                    Icons.Outlined.Info,
+                    "ApkSlim closed unexpectedly last time",
+                    "A report was saved on this phone. Share it so the problem can be fixed. Nothing is sent unless you choose to.",
+                    com.parag.apkslim.ui.components.BannerTone.WARNING,
+                    Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp),
+                ) {
+                    Row {
+                        TextButton(onClick = onDismissCrash) { Text("Dismiss") }
+                        TextButton(onClick = { onShareCrash(crashReport) }) { Text("Share report") }
+                    }
                 }
             }
         }

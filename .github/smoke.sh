@@ -2,7 +2,7 @@
 # Installs the release APK, opens each main screen, saves screenshots and any crash log.
 set -x
 mkdir -p shots
-APK=app/build/outputs/apk/release/app-release.apk
+APK=${1:-app/build/outputs/apk/release/app-release.apk}
 adb install -r "$APK"
 adb logcat -c
 adb shell am start -W -n com.parag.apkslim/.MainActivity
@@ -24,9 +24,20 @@ adb shell input tap $((WW*5/8)) $((HH-90)); sleep 3
 adb exec-out screencap -p > shots/6-history.png
 adb shell input tap $((WW*7/8)) $((HH-90)); sleep 3
 adb exec-out screencap -p > shots/7-settings.png
+# Home-tab smoothness: switch tabs back and forth and record frame timings.
+adb shell dumpsys gfxinfo com.parag.apkslim reset >/dev/null
+for i in 1 2 3; do
+  adb shell input tap $((WW*3/8)) $((HH-90)); sleep 1.5
+  adb shell input tap $((WW/8)) $((HH-90)); sleep 1.5
+done
+adb exec-out screencap -p > shots/8-home-again.png
+adb shell dumpsys gfxinfo com.parag.apkslim | grep -E "Total frames|Janky frames|percentile" > shots/frames.txt
+echo "===== FRAMES ====="; cat shots/frames.txt
 adb logcat -d -b crash > shots/crash.txt
 adb logcat -d | grep -E "AndroidRuntime|FATAL|apkslim" | tail -200 > shots/log.txt
 echo "===== CRASH LOG ====="; cat shots/crash.txt
 echo "===== APP LOG ====="; tail -80 shots/log.txt
-adb shell pidof com.parag.apkslim && echo "APP_ALIVE=yes" || echo "APP_ALIVE=no"
-exit 0
+if adb shell pidof com.parag.apkslim >/dev/null && ! grep -q "FATAL EXCEPTION" shots/crash.txt; then
+  echo "APP_ALIVE=yes"; exit 0
+fi
+echo "APP_ALIVE=no"; exit 1

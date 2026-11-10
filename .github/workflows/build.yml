@@ -1,10 +1,16 @@
-name: Build APK
+name: Build, test, release
 on:
   push:
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # 1. Unit tests on the critical paths, then the release APK.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -14,17 +20,75 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - run: chmod +x gradlew && ./gradlew :core:test assembleRelease --stacktrace
+      - name: Use private signing key from secrets (if configured)
+        env:
+          KS_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
+      - name: Test and build
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: chmod +x gradlew && ./gradlew :core:test assembleRelease --stacktrace
       - run: cp app/build/outputs/apk/release/app-release.apk ApkSlim.apk
       - uses: actions/upload-artifact@v4
         with:
           name: ApkSlim-release
           path: ApkSlim.apk
-      # Every push to main publishes the APK on the "latest" release (direct download link).
+
+  # 2. "Staging": install the exact APK on an Android 14 emulator, open every tab,
+  #    and fail if the app crashes. Nothing is published unless this passes.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ApkSlim-release
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch app, capture screenshots, crash log and frame timings
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: false
+          script: bash .github/smoke.sh ApkSlim.apk
+      - name: Publish screenshots to the screenshots branch
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p /tmp/shots && cp -r shots/. /tmp/shots/ 2>/dev/null || true
+          git config user.name "ApkSlim CI"; git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan screenshots
+          git rm -rf . -q
+          cp -r /tmp/shots/. .
+          git add -A
+          git commit -qm "Screenshots for ${GITHUB_SHA::7}" || exit 0
+          git push -f origin screenshots
+
+  # 3. Production: only main, only after tests and the emulator check passed.
+  publish:
+    needs: smoke
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ApkSlim-release
       - name: Publish release
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if gh release view latest >/dev/null 2>&1; then
             gh release upload latest ApkSlim.apk --clobber

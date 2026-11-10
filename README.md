@@ -53,3 +53,15 @@ The release build is signed with the debug key so it installs right away. Add yo
 ## Project layout
 - `core/` is the pure Kotlin engine: analyzer, optimizer, aligner, signer, self-signed certificate. It's unit-tested.
 - `app/` is the Android UI (Compose) plus the platform image codec, key management and installer.
+
+## Security and reliability
+
+ApkSlim runs fully offline: it has **no internet permission**, no account, no server and no database, so there are no API keys, passwords or user data to leak. What applies to an offline app is covered:
+
+- **Input checks**: every opened file is identified by its first bytes (not its name), capped at 4 GB, and refused if the phone lacks space. `.slim` and `.apks` contents are validated (counts, sizes, entry names), so a damaged or hostile file cannot write outside the app's own folder.
+- **Central error handling**: one place turns failures into clear messages (out of storage, damaged file, out of memory).
+- **Crash reports**: if the app closes unexpectedly, a report is saved on the phone and the next launch offers to share it. Nothing is sent automatically.
+- **Tests**: unit tests cover optimizing, signing, archive round trips and hostile inputs.
+- **Staging before release**: CI installs the exact APK on an Android 14 emulator and opens every tab; the download link is updated only if that passes.
+- **Dependencies**: Dependabot checks libraries and CI actions weekly.
+- **Signing keys stay out of the code**: release builds are signed with a private key from GitHub Actions secrets (`RELEASE_KEYSTORE_B64`, `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`). Without them CI falls back to a throwaway debug key that changes every build, so each update needs an uninstall first.

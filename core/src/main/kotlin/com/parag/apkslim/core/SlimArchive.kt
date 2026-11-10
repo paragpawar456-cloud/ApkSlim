@@ -125,13 +125,22 @@ object SlimArchive {
             require(ins.readInt() == VERSION) { "Unsupported archive version" }
             val label = ins.readUTF(); val pkg = ins.readUTF(); val ver = ins.readUTF(); val minSdk = ins.readInt()
             val apkCount = ins.readInt()
+            require(apkCount in 1..Limits.MAX_PARTS) { "Archive is damaged (bad part count)" }
             val names = ArrayList<String>()
+            val usedTargets = HashSet<String>()
+            var written = 0L
             val buffer = ByteArray(1 shl 16)
             repeat(apkCount) {
                 val apkName = ins.readUTF()
                 names += apkName
                 val entryCount = ins.readInt()
-                val target = outDir?.let { File(it, safeName(apkName)) }
+                require(entryCount in 0..Limits.MAX_ENTRIES) { "Archive is damaged (bad entry count)" }
+                val target = outDir?.let { dir ->
+                    var n = safeName(apkName)
+                    var i = 1
+                    while (!usedTargets.add(n)) n = "${i++}_" + safeName(apkName)
+                    File(dir, n)
+                }
                 val writer = target?.let { AlignedZipWriter(it) }
                 try {
                     repeat(entryCount) {
@@ -141,6 +150,14 @@ object SlimArchive {
                         val time = ins.readLong()
                         val size = ins.readLong()
                         val crc = ins.readLong()
+                        require(Limits.isSafeEntryName(name)) { "Archive is damaged (unsafe entry name)" }
+                        require(method == ZipEntry.STORED || method == ZipEntry.DEFLATED) { "Archive is damaged (bad entry type)" }
+                        require(size in 0..Limits.MAX_ENTRY_BYTES) { "Archive is damaged (bad entry size)" }
+                        if (outDir != null) {
+                            written += size
+                            require(written <= Limits.MAX_TOTAL_BYTES) { "Archive is too large to restore" }
+                            check(outDir.usableSpace > size + Limits.SPACE_MARGIN) { "No space left on the phone to restore this archive" }
+                        }
                         val body = BoundedInputStream(ins, size)
                         if (writer != null) writer.write(name, method, time, size, crc, body)
                         else while (body.read(buffer) >= 0) { /* drain to check CRCs */ }
@@ -155,7 +172,7 @@ object SlimArchive {
         }
     }
 
-    private fun safeName(n: String) = n.replace(Regex("[^A-Za-z0-9._-]"), "_").let { if (it.endsWith(".apk")) it else "$it.apk" }
+    private fun safeName(n: String) = n.replace(Regex("[^A-Za-z0-9._-]"), "_").trimStart('.').take(100).ifEmpty { "part" }.let { if (it.endsWith(".apk")) it else "$it.apk" }
 
     private class BoundedInputStream(private val src: InputStream, private var remaining: Long) : InputStream() {
         override fun read(): Int = if (remaining <= 0) -1 else src.read().also { if (it >= 0) remaining-- }

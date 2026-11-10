@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.compose.animation.core.tween
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -116,6 +117,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
     val toast by vm.toast.collectAsStateWithLifecycle()
     val openedArchive by vm.openedArchive.collectAsStateWithLifecycle()
     val storage by vm.storage.collectAsStateWithLifecycle()
+    val crashReport by vm.crashReport.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(toast) {
         toast?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); vm.toastShown() }
@@ -148,14 +150,29 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
         nav,
         startDestination = Routes.HOME,
         modifier = androidx.compose.ui.Modifier,
-        enterTransition = { slideInHorizontally { it / 4 } + fadeIn() },
-        exitTransition = { fadeOut() },
-        popEnterTransition = { fadeIn() },
-        popExitTransition = { slideOutHorizontally { it / 4 } + fadeOut() },
+        // Bottom-tab switches are an instant cross-fade (like Swiggy/Zomato); only drill-down screens slide.
+        enterTransition = {
+            if (isTabSwitch(initialState.destination.route, targetState.destination.route)) fadeIn(tween(90))
+            else slideInHorizontally(tween(220)) { it / 4 } + fadeIn(tween(220))
+        },
+        exitTransition = {
+            if (isTabSwitch(initialState.destination.route, targetState.destination.route)) fadeOut(tween(60)) else fadeOut(tween(150))
+        },
+        popEnterTransition = {
+            if (isTabSwitch(initialState.destination.route, targetState.destination.route)) fadeIn(tween(90)) else fadeIn(tween(180))
+        },
+        popExitTransition = {
+            if (isTabSwitch(initialState.destination.route, targetState.destination.route)) fadeOut(tween(60))
+            else slideOutHorizontally(tween(200)) { it / 4 } + fadeOut(tween(200))
+        },
     ) {
         composable(Routes.HOME) {
             LaunchedEffect(Unit) { vm.loadApps(); vm.refreshStorage() }
+            val ctx = androidx.compose.ui.platform.LocalContext.current
             HomeScreen(
+                crashReport = crashReport,
+                onShareCrash = { r -> com.parag.apkslim.ui.ApkActions.shareText(ctx, "ApkSlim crash report", r); vm.dismissCrashReport() },
+                onDismissCrash = { vm.dismissCrashReport() },
                 apps = apps,
                 storage = storage,
                 history = history,
@@ -266,6 +283,9 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
     }
     }
 }
+
+private val TAB_ROUTES = setOf(Routes.HOME, Routes.APPS, Routes.HISTORY, Routes.SETTINGS)
+private fun isTabSwitch(from: String?, to: String?) = from in TAB_ROUTES && to in TAB_ROUTES
 
 private fun NavHostController.navigateTab(route: String) {
     navigate(route) {
