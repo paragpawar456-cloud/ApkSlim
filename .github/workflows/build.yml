@@ -35,7 +35,7 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: chmod +x gradlew && ./gradlew :core:test assembleRelease --stacktrace
       - run: cp app/build/outputs/apk/release/app-release.apk ApkSlim.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ApkSlim-release
           path: ApkSlim.apk
