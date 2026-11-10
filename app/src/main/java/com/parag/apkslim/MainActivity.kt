@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.History
@@ -288,7 +289,7 @@ private fun BottomBar(route: String?, nav: NavHostController) {
         tonalElevation = 0.dp,
     ) {
         tabs.forEach { t ->
-            androidx.compose.material3.NavigationBarItem(
+            NavigationBarItem(
                 selected = route == t.route,
                 onClick = { if (route != t.route) nav.navigateTab(t.target) },
                 icon = { androidx.compose.material3.Icon(t.icon, null) },
