@@ -108,7 +108,7 @@ fun HistoryScreen(
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 6.dp)) {
                     StatTile(formatBytes(items.sumOf { it.savedBytes.coerceAtLeast(0) }), "total saved", Modifier.weight(1f))
-                    StatTile(formatPercent(items.map { it.savedPercent }.average().toFloat()), "average reduction", Modifier.weight(1f))
+                    StatTile(formatPercent(items.map { it.savedPercent.coerceAtLeast(0f) }.average().toFloat()), "average reduction", Modifier.weight(1f))
                     StatTile(items.size.toString(), "APKs", Modifier.weight(1f))
                 }
             }

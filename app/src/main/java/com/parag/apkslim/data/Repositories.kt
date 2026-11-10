@@ -24,7 +24,14 @@ data class InstalledApp(
     val splitCount: Int,
     val totalSize: Long,
     val isSystem: Boolean,
+    /** ApplicationInfo.CATEGORY_* (game, social, …), -1 if undefined. */
+    val category: Int = -1,
+    val lastUpdate: Long = 0,
 )
+
+data class StorageInfo(val total: Long, val free: Long) {
+    val used get() = total - free
+}
 
 /** Everything we know about the APK the user picked. */
 data class ApkInfo(
@@ -65,11 +72,18 @@ class AppRepository(private val context: Context) {
                     splitCount = splits,
                     totalSize = size,
                     isSystem = ai.flags and ApplicationInfo.FLAG_SYSTEM != 0,
+                    category = ai.category,
+                    lastUpdate = File(ai.sourceDir).lastModified(),
                 )
             }
             .sortedBy { it.label.lowercase() }
             .toList()
     }
+
+    fun storage(): StorageInfo = runCatching {
+        val st = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        StorageInfo(st.totalBytes, st.availableBytes)
+    }.getOrDefault(StorageInfo(0, 0))
 
     fun icon(packageName: String): Bitmap? {
         iconCache.get(packageName)?.let { return it }

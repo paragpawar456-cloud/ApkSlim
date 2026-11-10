@@ -102,11 +102,16 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
     private val cancelFlag = AtomicBoolean(false)
 
     init {
+        refreshStorage()
         refreshHistory()
         refreshSigning()
     }
 
     fun icon(pkg: String) = repo.icon(pkg)
+
+    private val _storage = MutableStateFlow(com.parag.apkslim.data.StorageInfo(0, 0))
+    val storage: StateFlow<com.parag.apkslim.data.StorageInfo> = _storage.asStateFlow()
+    fun refreshStorage() { viewModelScope.launch { _storage.value = withContext(Dispatchers.IO) { repo.storage() } } }
     fun iconFor(file: File) = repo.iconForArchive(file)
 
     fun loadApps(force: Boolean = false) {
@@ -159,7 +164,13 @@ class SlimViewModel(app: Application) : AndroidViewModel(app) {
                     AnalyzeState.Error(t.message ?: "Could not read this APK")
                 }
             }
-            (analyze.value as? AnalyzeState.Ready)?.let { applyPreset(Preset.BALANCED) }
+            (analyze.value as? AnalyzeState.Ready)?.let { ready ->
+                applyPreset(Preset.BALANCED)
+                // Pick the format that actually saves space: if an installable APK would save
+                // under 10 %, default to the compressed .slim archive.
+                val apkPct = ApkAnalyzer.estimate(ready.analysis, _options.value.copy(format = OutputFormat.APK)).total * 100.0 / ready.analysis.fileSize.coerceAtLeast(1)
+                setFormat(if (apkPct < 10) OutputFormat.ARCHIVE else OutputFormat.APK)
+            }
         }
     }
 

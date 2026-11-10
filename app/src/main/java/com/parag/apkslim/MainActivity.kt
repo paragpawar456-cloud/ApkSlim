@@ -18,6 +18,12 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -25,6 +31,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.parag.apkslim.ui.screens.AboutScreen
 import com.parag.apkslim.ui.screens.AnalyzeScreen
@@ -80,7 +87,10 @@ class MainActivity : ComponentActivity() {
 
 object Routes {
     const val HOME = "home"
-    const val APPS = "apps"
+    const val APPS = "apps?cat={cat}&focus={focus}"
+    const val APPS_TAB = "apps?cat=-100&focus=false"
+    const val HISTORY_TAB = "history?id=-1"
+    fun apps(category: Int? = null, focus: Boolean = false) = "apps?cat=${category ?: -100}&focus=$focus"
     const val ANALYZE = "analyze"
     const val PROCESS = "process"
     const val RESULT = "result"
@@ -104,6 +114,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
     val installing by vm.installing.collectAsStateWithLifecycle()
     val toast by vm.toast.collectAsStateWithLifecycle()
     val openedArchive by vm.openedArchive.collectAsStateWithLifecycle()
+    val storage by vm.storage.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(toast) {
         toast?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show(); vm.toastShown() }
@@ -124,32 +135,57 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
         }
     }
 
+    val backStack by nav.currentBackStackEntryAsState()
+    val route = backStack?.destination?.route
+    val showBar = route in setOf(Routes.HOME, Routes.APPS, Routes.HISTORY, Routes.SETTINGS)
+    androidx.compose.material3.Scaffold(
+        bottomBar = { if (showBar) BottomBar(route, nav) },
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+    ) { scaffoldPadding ->
+    val bottomPadding = scaffoldPadding.calculateBottomPadding()
     NavHost(
         nav,
         startDestination = Routes.HOME,
+        modifier = androidx.compose.ui.Modifier,
         enterTransition = { slideInHorizontally { it / 4 } + fadeIn() },
         exitTransition = { fadeOut() },
         popEnterTransition = { fadeIn() },
         popExitTransition = { slideOutHorizontally { it / 4 } + fadeOut() },
     ) {
         composable(Routes.HOME) {
+            LaunchedEffect(Unit) { vm.loadApps(); vm.refreshStorage() }
             HomeScreen(
+                apps = apps,
+                storage = storage,
                 history = history,
+                icon = vm::icon,
+                onSearch = { nav.navigate(Routes.apps(focus = true)) },
+                onCategory = { nav.navigate(Routes.apps(category = it)) },
+                onCompressApp = { vm.openInstalled(it); nav.navigate(Routes.ANALYZE) },
                 onPickFile = { pickApk.launch(arrayOf("*/*")) },
-                onInstalled = { nav.navigate(Routes.APPS) },
-                onHistory = { nav.navigate(Routes.history()) },
-                onSettings = { nav.navigate(Routes.SETTINGS) },
+                onHistory = { nav.navigateTab(Routes.HISTORY_TAB) },
                 onAbout = { nav.navigate(Routes.ABOUT) },
                 onOpenHistoryItem = { nav.navigate(Routes.history(it.id)) },
+                bottomPadding = bottomPadding,
             )
         }
-        composable(Routes.APPS) {
+        composable(
+            Routes.APPS,
+            arguments = listOf(
+                navArgument("cat") { type = NavType.IntType; defaultValue = -100 },
+                navArgument("focus") { type = NavType.BoolType; defaultValue = false },
+            ),
+        ) { entry ->
+            val cat = entry.arguments?.getInt("cat")?.takeIf { it != -100 }
             AppsScreen(
                 apps = apps,
                 load = { vm.loadApps() },
                 icon = vm::icon,
-                onBack = { nav.popBackStack() },
+                initialCategory = cat,
+                focusSearch = entry.arguments?.getBoolean("focus") == true,
+                onBack = if (nav.previousBackStackEntry != null) ({ nav.popBackStack(); Unit }) else null,
                 onPick = { vm.openInstalled(it); nav.navigate(Routes.ANALYZE) },
+                bottomPadding = bottomPadding,
             )
         }
         composable(Routes.ANALYZE) {
@@ -202,6 +238,7 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
                     onBack = close,
                     onRetry = close,
                     steps = com.parag.apkslim.ui.screens.RESTORE_STEPS,
+                    title = "Restoring your app",
                 )
             }
         }
@@ -210,18 +247,58 @@ private fun AppNav(nav: NavHostController, vm: SlimViewModel) {
             arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L }),
         ) { entry ->
             val id = entry.arguments?.getLong("id")?.takeIf { it >= 0 }
-            HistoryScreen(
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(bottom = bottomPadding)) { HistoryScreen(
                 items = history,
                 initialSelectedId = id,
                 onDelete = { vm.deleteHistory(it) },
                 onInstall = { vm.install(it) },
                 onClear = { vm.clearHistory() },
                 onBack = { nav.popBackStack() },
-            )
+            ) }
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(vm, signing, onAbout = { nav.navigate(Routes.ABOUT) }, onBack = { nav.popBackStack() })
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.padding(bottom = bottomPadding)) {
+                SettingsScreen(vm, signing, onAbout = { nav.navigate(Routes.ABOUT) }, onBack = { nav.popBackStack() })
+            }
         }
         composable(Routes.ABOUT) { AboutScreen(onBack = { nav.popBackStack() }) }
+    }
+    }
+}
+
+private fun NavHostController.navigateTab(route: String) {
+    navigate(route) {
+        popUpTo(Routes.HOME) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun BottomBar(route: String?, nav: NavHostController) {
+    data class Tab(val route: String, val target: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+    val tabs = listOf(
+        Tab(Routes.HOME, Routes.HOME, "Home", androidx.compose.material.icons.Icons.Outlined.Home),
+        Tab(Routes.APPS, Routes.APPS_TAB, "Apps", androidx.compose.material.icons.Icons.Outlined.Apps),
+        Tab(Routes.HISTORY, Routes.HISTORY_TAB, "History", androidx.compose.material.icons.Icons.Outlined.History),
+        Tab(Routes.SETTINGS, Routes.SETTINGS, "Settings", androidx.compose.material.icons.Icons.Outlined.Settings),
+    )
+    androidx.compose.material3.NavigationBar(
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.background,
+        tonalElevation = 0.dp,
+    ) {
+        tabs.forEach { t ->
+            androidx.compose.material3.NavigationBarItem(
+                selected = route == t.route,
+                onClick = { if (route != t.route) nav.navigateTab(t.target) },
+                icon = { androidx.compose.material3.Icon(t.icon, null) },
+                label = { androidx.compose.material3.Text(t.label) },
+                colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                    selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    indicatorColor = com.parag.apkslim.ui.theme.AppTheme.extra.accentSoft,
+                ),
+            )
+        }
     }
 }

@@ -1,19 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A package box being squeezed by two arrows: "make it smaller". -->
+<!-- ApkSlim mark: a parcel with a zipper being squeezed down. Safe zone: 33..75 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- box -->
+    <!-- parcel body -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M54,36 L70,44 L70,64 L54,72 L38,64 L38,44 Z" />
-    <path android:fillColor="#C9D4FF"
-        android:pathData="M54,52 L70,44 L70,64 L54,72 Z" />
-    <path android:fillColor="#2E5BFF" android:fillAlpha="0.35"
-        android:pathData="M38,44 L54,52 L70,44 L54,36 Z" />
-    <!-- left arrow pointing in -->
+        android:pathData="M38,46 Q38,42 42,42 L66,42 Q70,42 70,46 L70,70 Q70,74 66,74 L42,74 Q38,74 38,70 Z" />
+    <!-- lid -->
     <path android:fillColor="#FFFFFF"
-        android:pathData="M22,50 L30,50 L30,46 L36,54 L30,62 L30,58 L22,58 Z" />
-    <!-- right arrow pointing in -->
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M86,50 L78,50 L78,46 L72,54 L78,62 L78,58 L86,58 Z" />
+        android:pathData="M36,40 Q36,37 39,37 L69,37 Q72,37 72,40 L72,42 Q72,44 70,44 L38,44 Q36,44 36,42 Z" />
+    <!-- zipper track -->
+    <path android:fillColor="#FF5B2E" android:pathData="M52.5,37 L55.5,37 L55.5,74 L52.5,74 Z" />
+    <!-- zipper teeth -->
+    <path android:fillColor="#FFFFFF" android:pathData="M53,47h2v2h-2z M53,52h2v2h-2z M53,57h2v2h-2z M53,62h2v2h-2z" />
+    <!-- zipper pull -->
+    <path android:fillColor="#1B1E28"
+        android:pathData="M51,64 Q51,62 53,62 L55,62 Q57,62 57,64 L57,69 Q57,71 55,71 L53,71 Q51,71 51,69 Z" />
+    <!-- squeeze chevrons above -->
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.9"
+        android:pathData="M46,28 L54,33 L62,28 L62,31 L54,36 L46,31 Z" />
 </vector>
