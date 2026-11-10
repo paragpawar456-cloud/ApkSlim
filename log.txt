@@ -1,0 +1,94 @@
+11-10 03:46:15.955   520   818 V SplashScreenExceptionList: SplashScreen checking exception for package com.parag.apkslim (target sdk:35) -> false
+11-10 03:46:15.958   520   818 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.parag.apkslim/.MainActivity} with LAUNCH_MULTIPLE from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+11-10 03:46:16.021   520  1930 D CoreBackPreview: Window{c29699d u0 Splash Screen com.parag.apkslim}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@8f1c409, mPriority=0, mIsAnimationCallback=false}
+11-10 03:46:16.316  2700  2700 I m.parag.apkslim: Using CollectorTypeCC GC.
+11-10 03:46:16.316  2700  2700 W m.parag.apkslim: Unexpected CPU variant for x86: x86_64.
+11-10 03:46:16.316  2700  2700 W m.parag.apkslim: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-10 03:46:16.357   520   551 I ActivityManager: Start proc 2700:com.parag.apkslim/u0a192 for next-top-activity {com.parag.apkslim/com.parag.apkslim.MainActivity}
+11-10 03:46:16.386  2700  2700 E m.parag.apkslim: Not starting debugger since process cannot load the jdwp agent.
+11-10 03:46:16.672  2700  2700 D nativeloader: Configuring clns-6 for other apk /data/app/~~VdrLNXrc9sx6yPMx8D3mkg==/com.parag.apkslim-4x3dZ0TySThHRHLaymLfoA==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~VdrLNXrc9sx6yPMx8D3mkg==/com.parag.apkslim-4x3dZ0TySThHRHLaymLfoA==/lib/x86_64:/data/app/~~VdrLNXrc9sx6yPMx8D3mkg==/com.parag.apkslim-4x3dZ0TySThHRHLaymLfoA==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.parag.apkslim
+11-10 03:46:16.728  2700  2700 V GraphicsEnvironment: ANGLE GameManagerService for com.parag.apkslim: false
+11-10 03:46:16.728  2700  2700 V GraphicsEnvironment: com.parag.apkslim is not listed in per-application setting
+11-10 03:46:16.874   520   539 V WindowManager:     info={id=5 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{db15e17 Task{489d57c #8 type=standard A=10192:com.parag.apkslim}}} m=OPEN f=MOVE_TO_TOP leash=Surface(name=Task=8)/@0xc31394d sb=Rect(0, 0 - 320, 640) eb=Rect(0, 0 - 320, 640) d=0},{WCT{RemoteToken{bfa4204 Task{a26f7c3 #1 type=home}}} m=TO_BACK f=NONE leash=Surface(name=Task=1)/@0xfadc0a1 sb=Rect(0, 0 - 320, 640) eb=Rect(0, 0 - 320, 640) d=0},{null m=TO_FRONT f=IS_WALLPAPER leash=Surface(name=WallpaperWindowToken{90eadb7 token=android.os.Binder@2b03606})/@0xa21f0e4 sb=Rect(0, 0 - 320, 640) eb=Rect(0, 0 - 320, 640) d=0}]}
+11-10 03:46:16.876   520   806 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10192, mPackageName='com.parag.apkslim, mAppProcessToken='null'}
+11-10 03:46:17.420   520  1984 W InputManager-JNI: Input channel object '7a51945 com.parag.apkslim/com.parag.apkslim.MainActivity (client)' was disposed without first being removed with the input manager!
+11-10 03:46:17.929  1057  1057 D CarrierSvcBindHelper: onPackageAdded: com.parag.apkslim
+11-10 03:46:17.969  1057  1326 D ImsResolver: maybeAddedImsService, packageName: com.parag.apkslim
+11-10 03:46:18.278  1097  1139 I Launcher.IconCache: Database bulk icon loading failed, using fallback bulk icon loading for: ComponentInfo{com.parag.apkslim/com.parag.apkslim.MainActivity}
+11-10 03:46:18.379   520  2261 D CoreBackPreview: Window{cf3a713 u0 com.parag.apkslim/com.parag.apkslim.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d0e4eb, mPriority=0, mIsAnimationCallback=false}
+11-10 03:46:19.001  1057  1057 D CarrierSvcBindHelper: onPackageModified: com.parag.apkslim
+11-10 03:46:19.180  1057  1326 D ImsResolver: maybeAddedImsService, packageName: com.parag.apkslim
+11-10 03:46:20.134   520  1979 I WindowManager: finishDrawing of relaunch: Window{cf3a713 u0 com.parag.apkslim/com.parag.apkslim.MainActivity} 3463ms
+11-10 03:46:20.877   520   539 I ActivityTaskManager: Displayed com.parag.apkslim/.MainActivity for user 0: +4s282ms
+11-10 03:46:20.942   520   937 I ImeTracker: com.parag.apkslim:a62bbad0: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+11-10 03:46:20.942   520   937 I ImeTracker: com.parag.apkslim:a62bbad0: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-10 03:46:21.024  1568  1568 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x0(NULL) imeOptions=0x0 privateImeOptions=null actionName=UNSPECIFIED actionLabel=null actionId=0 initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=0 fieldName=null extras=null}, false)
+11-10 03:46:21.247   520   536 W InputManager-JNI: Input channel object 'c29699d Splash Screen com.parag.apkslim (client)' was disposed without first being removed with the input manager!
+11-10 03:46:21.248   520   941 D CoreBackPreview: Window{c29699d u0 Splash Screen com.parag.apkslim EXITING}: Setting back callback null
+11-10 03:46:22.329   837   837 I SafetyLabelChangedBroadcastReceiver: received broadcast packageName: com.parag.apkslim, current user: UserHandle{0}, packageChangeEvent: NEW_INSTALL, intent user: UserHandle{0}
+11-10 03:46:22.967  2700  3230 D ProfileInstaller: Installing profile for com.parag.apkslim
+11-10 03:46:26.375  1629  1629 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.parag.apkslim], userId:[0], reason:[package is added.].
+11-10 03:46:26.756  1629  1629 I AiAiEcho: AppFetcherImpl onPackageChanged com.parag.apkslim.
+11-10 03:46:26.776  1629  3050 I AiAiEcho: AppIndexer Package:[com.parag.apkslim] UserProfile:[0] Enabled:[true].
+11-10 03:46:26.778  1629  3050 I AiAiEcho: AppFetcherImplV2 updateApps package:[com.parag.apkslim], userId:[0], reason:[package is updated.].
+11-10 03:46:28.905   520   626 W InputDispatcher: Not sending touch gesture to 62e8a13 ActivityRecordInputSink com.parag.apkslim/.MainActivity because it has config NO_INPUT_CHANNEL
+11-10 03:46:29.323  2700  2735 W m.parag.apkslim: Cleared Reference was only reachable from finalizer (only reported once)
+11-10 03:46:29.398  1478  3227 I BlockstoreStorage: Clearing Blockstore Data for package com.parag.apkslim [CONTEXT service_id=258 ]
+11-10 03:46:30.387  1433  2835 I FontLog : Package com.parag.apkslim has no metadata [CONTEXT service_id=132 ]
+11-10 03:46:37.109  1568  1568 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x8001(Normal) imeOptions=0x2000006 privateImeOptions=null actionName=DONE actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=-1 fieldName=null extras=Bundle[mParcelledData.dataSize=404]}, false)
+11-10 03:46:37.117  1568  1568 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x8001(Normal) imeOptions=0x2000006 privateImeOptions=null actionName=DONE actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=-1 fieldName=null extras=Bundle[mParcelledData.dataSize=404]}, true)
+11-10 03:46:37.128  2700  2700 I ImeTracker: com.parag.apkslim:3a385281: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT_BY_INSETS_API
+11-10 03:46:37.149  1568  1568 I GoogleInputMethodService: GoogleInputMethodService.onStartInputView():1995 onStartInputView(EditorInfo{inputType=0x8001(Normal) imeOptions=0x2000006 privateImeOptions=null actionName=DONE actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=-1 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}]}, false)
+11-10 03:46:37.474  2700  2700 I ImeTracker: com.parag.apkslim:32a611c: onRequestShow at ORIGIN_CLIENT_SHOW_SOFT_INPUT reason SHOW_SOFT_INPUT
+11-10 03:46:37.545  1568  1568 I AndroidIME: AbstractIme.onActivate():86 LatinIme.onActivate() : EditorInfo = inputType=0x8001(Normal) imeOptions=0x2000006 privateImeOptions=null actionName=DONE actionLabel=null actionId=0 initialSelStart=0 initialSelEnd=0 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=-1 fieldName=null extras=Bundle[{android.support.text.emoji.emojiCompat_metadataVersion=9, androidx.core.view.inputmethod.EditorInfoCompat.STYLUS_HANDWRITING_ENABLED=true, android.support.text.emoji.emojiCompat_replaceAll=false}], IncognitoMode = false, DeviceLocked = false
+11-10 03:46:37.703   520   891 D CoreBackPreview: Window{cf3a713 u0 com.parag.apkslim/com.parag.apkslim.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@144a31e, mPriority=0, mIsAnimationCallback=false}
+11-10 03:46:37.729   520   594 I ImeTracker: com.parag.apkslim:3a385281: onFailed at PHASE_WM_SHOW_IME_RUNNER
+11-10 03:46:39.398  2700  2700 I ImeTracker: com.parag.apkslim:32a611c: onShown
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8514, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8522, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8544, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8552, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8560, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8568, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8576, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8584, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8592, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8600, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8608, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8616, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8624, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8632, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed App frame:UNKNOWN: 88, 8647, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.532  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 88, 8647, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:39.533  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 8662, 0, CUJ=J<IME_INSETS_ANIMATION::0@1@com.parag.apkslim>
+11-10 03:46:43.059   520   626 W InputDispatcher: Not sending touch gesture to 62e8a13 ActivityRecordInputSink com.parag.apkslim/.MainActivity because it has config NO_INPUT_CHANNEL
+11-10 03:46:45.862   520  1960 I ImeTracker: com.parag.apkslim:4c25d186: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_SOFT_INPUT_BY_BACK_KEY
+11-10 03:46:45.904   520  1983 D CoreBackPreview: Window{cf3a713 u0 com.parag.apkslim/com.parag.apkslim.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@3970621, mPriority=0, mIsAnimationCallback=false}
+11-10 03:46:46.200  2700  2700 I ImeTracker: com.parag.apkslim:a2dc8c14: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT_BY_INSETS_API
+11-10 03:46:46.200   520  1980 I ImeTracker: com.parag.apkslim:a2dc8c14: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-10 03:46:46.201  2700  2700 I ImeTracker: com.parag.apkslim:4c25d186: onHidden
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9782, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9790, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9805, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9820, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9828, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9836, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9844, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:PREDICTION_ERROR, 9852, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:JANK_SURFACEFLINGER_DEADLINE_MISSED, 9860, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed App frame:UNKNOWN: 24, 9868, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 24, 9868, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9875, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9883, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9891, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9899, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9907, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9915, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9923, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9931, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:46.265  2700  2700 W FrameTracker: Missed SF frame:UNKNOWN: 80, 9939, 0, CUJ=J<IME_INSETS_ANIMATION::1@1@com.parag.apkslim>
+11-10 03:46:47.154  2700  2700 I ImeTracker: com.parag.apkslim:61ecd098: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+11-10 03:46:47.158   520  1981 I ImeTracker: com.parag.apkslim:61ecd098: onCancelled at PHASE_SERVER_SHOULD_HIDE
+11-10 03:46:47.158  2700  2700 I ImeTracker: com.parag.apkslim:7d522ddf: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT_BY_INSETS_API
+11-10 03:46:47.158  2700  2700 I ImeTracker: com.parag.apkslim:7d522ddf: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+11-10 03:46:47.159  1568  1568 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x0(NULL) imeOptions=0x0 privateImeOptions=null actionName=UNSPECIFIED actionLabel=null actionId=0 initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0 hintText=null label=null packageName=com.parag.apkslim fieldId=0 fieldName=null extras=null}, true)
